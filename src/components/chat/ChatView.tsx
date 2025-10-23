@@ -62,26 +62,25 @@ export function ChatView({ bookId }: ChatViewProps) {
 
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
-      // Save user message
-      const { error: userError } = await supabase
-        .from('chats')
-        .insert([{ book_id: bookId, role: 'user', content }]);
+      const { data, error } = await supabase.functions.invoke('chat-with-ai', {
+        body: { bookId, userMessage: content }
+      });
 
-      if (userError) throw userError;
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
-      // Call AI function (to be implemented)
-      // For now, just echo back
-      const aiResponse = `Recebi sua mensagem: "${content}". A integração com IA será implementada em breve!`;
-      
-      const { error: aiError } = await supabase
-        .from('chats')
-        .insert([{ book_id: bookId, role: 'assistant', content: aiResponse }]);
-
-      if (aiError) throw aiError;
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       setMessage('');
       queryClient.invalidateQueries({ queryKey: ['chats', bookId] });
+      queryClient.invalidateQueries({ queryKey: ['summary', bookId] });
+      
+      if (data?.fichamentoUpdated) {
+        toast.success('Fichamento atualizado!', {
+          description: 'Confira na aba Fichamento'
+        });
+      }
     },
     onError: (error: any) => {
       toast.error(error.message || 'Erro ao enviar mensagem');
