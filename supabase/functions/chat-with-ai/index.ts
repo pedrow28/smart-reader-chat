@@ -91,6 +91,7 @@ Seja conversacional, empático e ajude o usuário a extrair insights valiosos do
       throw new Error('LOVABLE_API_KEY not configured');
     }
 
+    // Call AI with streaming enabled
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -150,7 +151,8 @@ Seja conversacional, empático e ajude o usuário a extrair insights valiosos do
             }
           }
         ],
-        tool_choice: 'auto'
+        tool_choice: 'auto',
+        stream: true
       }),
     });
 
@@ -164,65 +166,143 @@ Seja conversacional, empático e ajude o usuário a extrair insights valiosos do
       throw new Error(`AI API error: ${aiResponse.status}`);
     }
 
-    const aiData = await aiResponse.json();
-    console.log('AI Response:', JSON.stringify(aiData, null, 2));
+    // Set up streaming response
+    const encoder = new TextEncoder();
+    let fullMessage = '';
+    let toolCalls: any[] = [];
 
-    const choice = aiData.choices?.[0];
-    const assistantMessage = choice?.message?.content || 'Desculpe, não consegui processar sua mensagem.';
-    const toolCalls = choice?.message?.tool_calls || [];
+    const stream = new ReadableStream({
+      async start(controller) {
+        const reader = aiResponse.body?.getReader();
+        if (!reader) {
+          controller.close();
+          return;
+        }
 
-    // Save assistant message
-    await supabaseClient
-      .from('chats')
-      .insert([{ book_id: bookId, role: 'assistant', content: assistantMessage }]);
+        const decoder = new TextDecoder();
+        let buffer = '';
 
-    // Process tool calls (update fichamento)
-    if (toolCalls.length > 0) {
-      for (const toolCall of toolCalls) {
-        if (toolCall.function?.name === 'update_fichamento') {
-          try {
-            const fichamentoUpdate = JSON.parse(toolCall.function.arguments);
-            console.log('Updating fichamento:', fichamentoUpdate);
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
 
-            // Merge with existing summary
-            const updatedSummary = {
-              book_id: bookId,
-              reference: fichamentoUpdate.reference || currentSummary?.reference || null,
-              thesis: fichamentoUpdate.thesis || currentSummary?.thesis || null,
-              key_ideas: fichamentoUpdate.key_ideas || currentSummary?.key_ideas || null,
-              citations: fichamentoUpdate.citations || currentSummary?.citations || null,
-              counterpoints: fichamentoUpdate.counterpoints || currentSummary?.counterpoints || null,
-              applications: fichamentoUpdate.applications || currentSummary?.applications || null,
-              vocabulary: fichamentoUpdate.vocabulary || currentSummary?.vocabulary || null,
-              bibliography: fichamentoUpdate.bibliography || currentSummary?.bibliography || null,
-            };
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
 
-            if (currentSummary) {
-              await supabaseClient
-                .from('summaries')
-                .update(updatedSummary)
-                .eq('book_id', bookId);
-            } else {
-              await supabaseClient
-                .from('summaries')
-                .insert([updatedSummary]);
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const data = line.slice(6);
+                if (data === '[DONE]') continue;
+
+                try {
+                  const parsed = JSON.parse(data);
+                  const delta = parsed.choices?.[0]?.delta;
+
+                  // Stream content tokens
+                  if (delta?.content) {
+                    fullMessage += delta.content;
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+                      type: 'content',
+                      content: delta.content 
+                    })}\n\n`));
+                  }
+
+                  // Collect tool calls
+                  if (delta?.tool_calls) {
+                    for (const toolCall of delta.tool_calls) {
+                      if (!toolCalls[toolCall.index]) {
+                        toolCalls[toolCall.index] = {
+                          id: toolCall.id,
+                          type: 'function',
+                          function: { name: '', arguments: '' }
+                        };
+                      }
+                      if (toolCall.function?.name) {
+                        toolCalls[toolCall.index].function.name = toolCall.function.name;
+                      }
+                      if (toolCall.function?.arguments) {
+                        toolCalls[toolCall.index].function.arguments += toolCall.function.arguments;
+                      }
+                    }
+                  }
+                } catch (e) {
+                  console.error('Error parsing SSE data:', e);
+                }
+              }
             }
-
-            console.log('Fichamento updated successfully');
-          } catch (error) {
-            console.error('Error updating fichamento:', error);
           }
+
+          // Save assistant message to database
+          await supabaseClient
+            .from('chats')
+            .insert([{ book_id: bookId, role: 'assistant', content: fullMessage }]);
+
+          // Process tool calls (update fichamento)
+          let fichamentoUpdated = false;
+          if (toolCalls.length > 0) {
+            for (const toolCall of toolCalls) {
+              if (toolCall.function?.name === 'update_fichamento') {
+                try {
+                  const fichamentoUpdate = JSON.parse(toolCall.function.arguments);
+                  console.log('Updating fichamento:', fichamentoUpdate);
+
+                  // Merge with existing summary
+                  const updatedSummary = {
+                    book_id: bookId,
+                    reference: fichamentoUpdate.reference || currentSummary?.reference || null,
+                    thesis: fichamentoUpdate.thesis || currentSummary?.thesis || null,
+                    key_ideas: fichamentoUpdate.key_ideas || currentSummary?.key_ideas || null,
+                    citations: fichamentoUpdate.citations || currentSummary?.citations || null,
+                    counterpoints: fichamentoUpdate.counterpoints || currentSummary?.counterpoints || null,
+                    applications: fichamentoUpdate.applications || currentSummary?.applications || null,
+                    vocabulary: fichamentoUpdate.vocabulary || currentSummary?.vocabulary || null,
+                    bibliography: fichamentoUpdate.bibliography || currentSummary?.bibliography || null,
+                  };
+
+                  if (currentSummary) {
+                    await supabaseClient
+                      .from('summaries')
+                      .update(updatedSummary)
+                      .eq('book_id', bookId);
+                  } else {
+                    await supabaseClient
+                      .from('summaries')
+                      .insert([updatedSummary]);
+                  }
+
+                  fichamentoUpdated = true;
+                  console.log('Fichamento updated successfully');
+                } catch (error) {
+                  console.error('Error updating fichamento:', error);
+                }
+              }
+            }
+          }
+
+          // Send completion event
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+            type: 'done',
+            fichamentoUpdated 
+          })}\n\n`));
+
+          controller.close();
+        } catch (error) {
+          console.error('Stream error:', error);
+          controller.error(error);
         }
       }
-    }
+    });
 
-    return new Response(
-      JSON.stringify({ 
-        message: assistantMessage,
-        fichamentoUpdated: toolCalls.length > 0
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(stream, {
+      headers: { 
+        ...corsHeaders, 
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive'
+      }
+    });
 
   } catch (error: any) {
     console.error('Error in chat-with-ai:', error);

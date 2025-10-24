@@ -1,14 +1,20 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import { FileText, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { FileText, Loader2, Download } from 'lucide-react';
+import { toast } from 'sonner';
+import jsPDF from 'jspdf';
 
 interface FichamentoViewProps {
   bookId: string;
 }
 
 export function FichamentoView({ bookId }: FichamentoViewProps) {
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+
   const { data: summary, isLoading } = useQuery({
     queryKey: ['summary', bookId],
     queryFn: async () => {
@@ -72,13 +78,162 @@ export function FichamentoView({ bookId }: FichamentoViewProps) {
     { title: 'Bibliografia', content: summary.bibliography },
   ];
 
+  // Export as PDF
+  const exportAsPDF = () => {
+    try {
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 20;
+      const maxWidth = pageWidth - 2 * margin;
+      let yPosition = margin;
+
+      // Helper function to add text with wrapping and page breaks
+      const addText = (text: string, fontSize: number, isBold: boolean = false) => {
+        doc.setFontSize(fontSize);
+        if (isBold) {
+          doc.setFont('helvetica', 'bold');
+        } else {
+          doc.setFont('helvetica', 'normal');
+        }
+
+        const lines = doc.splitTextToSize(text, maxWidth);
+        
+        for (const line of lines) {
+          if (yPosition + 10 > pageHeight - margin) {
+            doc.addPage();
+            yPosition = margin;
+          }
+          doc.text(line, margin, yPosition);
+          yPosition += fontSize / 2 + 2;
+        }
+      };
+
+      // Title
+      addText(`Fichamento: ${book?.title || 'Livro'}`, 18, true);
+      yPosition += 5;
+      
+      if (book?.author) {
+        addText(`Autor: ${book.author}`, 12);
+        yPosition += 5;
+      }
+
+      yPosition += 10;
+
+      // Sections
+      sections.forEach((section) => {
+        if (section.content) {
+          // Section title
+          addText(section.title, 14, true);
+          yPosition += 5;
+
+          // Section content
+          addText(section.content, 11);
+          yPosition += 10;
+        }
+      });
+
+      // Footer
+      if (yPosition + 20 > pageHeight - margin) {
+        doc.addPage();
+        yPosition = margin;
+      }
+      yPosition += 10;
+      doc.setFontSize(9);
+      doc.setTextColor(128);
+      doc.text(`Gerado via LumenRead — ${new Date().toLocaleDateString('pt-BR')}`, margin, yPosition);
+
+      // Save file
+      const fileName = `fichamento_${book?.title?.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'livro'}.pdf`;
+      doc.save(fileName);
+
+      toast.success('Fichamento exportado com sucesso!');
+      setIsExportDialogOpen(false);
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      toast.error('Erro ao exportar PDF');
+    }
+  };
+
+  // Export as Markdown
+  const exportAsMarkdown = () => {
+    try {
+      let markdown = `# Fichamento: ${book?.title || 'Livro'}\n\n`;
+      
+      if (book?.author) {
+        markdown += `**Autor:** ${book.author}\n\n`;
+      }
+
+      markdown += `---\n\n`;
+
+      sections.forEach((section) => {
+        if (section.content) {
+          markdown += `## ${section.title}\n\n`;
+          markdown += `${section.content}\n\n`;
+        }
+      });
+
+      markdown += `---\n\n`;
+      markdown += `*Gerado via LumenRead — ${new Date().toLocaleDateString('pt-BR')}*\n`;
+
+      // Create and download file
+      const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `fichamento_${book?.title?.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'livro'}.md`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast.success('Fichamento exportado com sucesso!');
+      setIsExportDialogOpen(false);
+    } catch (error) {
+      console.error('Error exporting Markdown:', error);
+      toast.error('Erro ao exportar Markdown');
+    }
+  };
+
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-4xl mx-auto p-6 space-y-6">
+        {/* Header with export button */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-2xl">{book?.title}</CardTitle>
-            <CardDescription>{book?.author}</CardDescription>
+            <div className="flex items-start justify-between">
+              <div>
+                <CardTitle className="text-2xl">{book?.title}</CardTitle>
+                <CardDescription>{book?.author}</CardDescription>
+              </div>
+              
+              <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <Download className="h-4 w-4" />
+                    Exportar
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Exportar Fichamento</DialogTitle>
+                    <DialogDescription>
+                      Escolha o formato de exportação do seu fichamento
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="flex flex-col gap-3 mt-4">
+                    <Button onClick={exportAsPDF} className="gap-2">
+                      <FileText className="h-4 w-4" />
+                      Exportar como PDF
+                    </Button>
+                    <Button onClick={exportAsMarkdown} variant="outline" className="gap-2">
+                      <FileText className="h-4 w-4" />
+                      Exportar como Markdown
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
           </CardHeader>
         </Card>
 

@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Send, Loader2 } from 'lucide-react';
+import { Send, Loader2, Square } from 'lucide-react';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
 import { cn } from '@/lib/utils';
@@ -15,6 +15,8 @@ interface ChatViewProps {
 export function ChatView({ bookId }: ChatViewProps) {
   const [message, setMessage] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
+  const [streamingContent, setStreamingContent] = useState('');
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
   const queryClient = useQueryClient();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -33,9 +35,10 @@ export function ChatView({ bookId }: ChatViewProps) {
     enabled: !!bookId,
   });
 
+  // Auto-scroll to bottom when messages or streaming content changes
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, streamingContent]);
 
   // Setup realtime subscription
   useEffect(() => {
@@ -60,40 +63,105 @@ export function ChatView({ bookId }: ChatViewProps) {
     };
   }, [bookId, queryClient]);
 
-  const sendMessageMutation = useMutation({
-    mutationFn: async (content: string) => {
-      const { data, error } = await supabase.functions.invoke('chat-with-ai', {
-        body: { bookId, userMessage: content }
-      });
+  // Handle streaming chat with AI
+  const handleStreamingChat = async (userMessage: string) => {
+    setIsStreaming(true);
+    setStreamingContent('');
+    setMessage('');
 
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+    const controller = new AbortController();
+    setAbortController(controller);
 
-      return data;
-    },
-    onSuccess: (data) => {
-      setMessage('');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-with-ai`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ bookId, userMessage }),
+          signal: controller.signal,
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('No reader available');
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let fichamentoUpdated = false;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            if (data === '[DONE]') continue;
+
+            try {
+              const parsed = JSON.parse(data);
+              
+              if (parsed.type === 'content') {
+                setStreamingContent(prev => prev + parsed.content);
+              } else if (parsed.type === 'done') {
+                fichamentoUpdated = parsed.fichamentoUpdated;
+              }
+            } catch (e) {
+              console.error('Error parsing stream data:', e);
+            }
+          }
+        }
+      }
+
+      // Refresh messages and summary
       queryClient.invalidateQueries({ queryKey: ['chats', bookId] });
       queryClient.invalidateQueries({ queryKey: ['summary', bookId] });
-      
-      if (data?.fichamentoUpdated) {
+
+      if (fichamentoUpdated) {
         toast.success('Fichamento atualizado!', {
           description: 'Confira na aba Fichamento'
         });
       }
-    },
-    onError: (error: any) => {
-      toast.error(error.message || 'Erro ao enviar mensagem');
-    },
-  });
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        toast.info('Geração interrompida pelo usuário');
+        queryClient.invalidateQueries({ queryKey: ['chats', bookId] });
+      } else {
+        console.error('Streaming error:', error);
+        toast.error(error.message || 'Erro ao enviar mensagem');
+      }
+    } finally {
+      setIsStreaming(false);
+      setStreamingContent('');
+      setAbortController(null);
+    }
+  };
+
+  const handleStopGeneration = () => {
+    if (abortController) {
+      abortController.abort();
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim() || isStreaming) return;
     
-    setIsStreaming(true);
-    sendMessageMutation.mutate(message.trim());
-    setTimeout(() => setIsStreaming(false), 500);
+    handleStreamingChat(message.trim());
   };
 
   return (
@@ -137,6 +205,22 @@ export function ChatView({ bookId }: ChatViewProps) {
                 </div>
               </div>
             ))}
+            
+            {/* Streaming message */}
+            {isStreaming && streamingContent && (
+              <div className="flex justify-start">
+                <div className="max-w-[80%] rounded-lg px-4 py-2 bg-[hsl(var(--chat-assistant-bg))] border">
+                  <div className="prose prose-sm dark:prose-invert max-w-none">
+                    <ReactMarkdown>{streamingContent}</ReactMarkdown>
+                  </div>
+                  <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    <span>IA está respondendo…</span>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             <div ref={messagesEndRef} />
           </>
         )}
@@ -151,6 +235,7 @@ export function ChatView({ bookId }: ChatViewProps) {
             placeholder="Digite sua mensagem..."
             className="resize-none"
             rows={3}
+            disabled={isStreaming}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -158,18 +243,28 @@ export function ChatView({ bookId }: ChatViewProps) {
               }
             }}
           />
-          <Button
-            type="submit"
-            size="icon"
-            disabled={!message.trim() || isStreaming}
-            className="h-full"
-          >
+          <div className="flex flex-col gap-2">
             {isStreaming ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Button
+                type="button"
+                size="icon"
+                variant="destructive"
+                onClick={handleStopGeneration}
+                className="h-full"
+              >
+                <Square className="h-4 w-4" />
+              </Button>
             ) : (
-              <Send className="h-4 w-4" />
+              <Button
+                type="submit"
+                size="icon"
+                disabled={!message.trim()}
+                className="h-full"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
             )}
-          </Button>
+          </div>
         </form>
       </div>
     </div>
