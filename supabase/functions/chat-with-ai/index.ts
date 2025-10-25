@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { bookId, userMessage } = await req.json();
+    const { bookId, userMessage, useContextMemory = true } = await req.json();
     
     if (!bookId || !userMessage) {
       throw new Error('bookId and userMessage are required');
@@ -34,13 +34,17 @@ serve(async (req) => {
       throw new Error('Book not found');
     }
 
-    // Get chat history
-    const { data: chatHistory } = await supabaseClient
-      .from('chats')
-      .select('*')
-      .eq('book_id', bookId)
-      .order('created_at', { ascending: true })
-      .limit(20);
+    // Get chat history only if context memory is enabled
+    let chatHistory: any[] = [];
+    if (useContextMemory) {
+      const { data } = await supabaseClient
+        .from('chats')
+        .select('role, content')
+        .eq('book_id', bookId)
+        .order('created_at', { ascending: true })
+        .limit(10); // Last 10 messages for context
+      chatHistory = data || [];
+    }
 
     // Get current summary
     const { data: currentSummary } = await supabaseClient
@@ -53,11 +57,6 @@ serve(async (req) => {
     await supabaseClient
       .from('chats')
       .insert([{ book_id: bookId, role: 'user', content: userMessage }]);
-
-    // Prepare context for AI
-    const conversationContext = chatHistory?.map(m => 
-      `${m.role === 'user' ? 'Usuário' : 'Assistente'}: ${m.content}`
-    ).join('\n') || '';
 
     const summaryContext = currentSummary ? `
 Fichamento atual:
@@ -102,7 +101,11 @@ Seja conversacional, empático e ajude o usuário a extrair insights valiosos do
         model: 'google/gemini-2.5-flash',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Histórico recente:\n${conversationContext}\n\nNova mensagem: ${userMessage}` }
+          ...chatHistory.map(msg => ({
+            role: msg.role,
+            content: msg.content
+          })),
+          { role: 'user', content: userMessage }
         ],
         tools: [
           {

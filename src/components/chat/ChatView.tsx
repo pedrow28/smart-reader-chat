@@ -3,7 +3,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Send, Loader2, Square } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Send, Loader2, Square, Brain } from 'lucide-react';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
 import { cn } from '@/lib/utils';
@@ -17,6 +19,7 @@ export function ChatView({ bookId }: ChatViewProps) {
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
   const [abortController, setAbortController] = useState<AbortController | null>(null);
+  const [useContextMemory, setUseContextMemory] = useState(true);
   const queryClient = useQueryClient();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -83,7 +86,11 @@ export function ChatView({ bookId }: ChatViewProps) {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
           },
-          body: JSON.stringify({ bookId, userMessage }),
+          body: JSON.stringify({ 
+            bookId, 
+            userMessage,
+            useContextMemory 
+          }),
           signal: controller.signal,
         }
       );
@@ -166,6 +173,28 @@ export function ChatView({ bookId }: ChatViewProps) {
 
   return (
     <div className="flex flex-col h-full">
+      {/* Memory Toggle */}
+      <div className="border-b p-3 bg-muted/30">
+        <div className="flex items-center justify-between max-w-4xl mx-auto">
+          <div className="flex items-center gap-2">
+            <Brain className="h-4 w-4 text-muted-foreground" />
+            <Label htmlFor="memory-toggle" className="text-sm cursor-pointer">
+              Memória de contexto
+            </Label>
+          </div>
+          <Switch
+            id="memory-toggle"
+            checked={useContextMemory}
+            onCheckedChange={setUseContextMemory}
+          />
+        </div>
+        {useContextMemory && (
+          <p className="text-xs text-muted-foreground mt-1 text-center">
+            💭 IA está usando contexto das últimas conversas
+          </p>
+        )}
+      </div>
+
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {isLoading ? (
@@ -228,12 +257,12 @@ export function ChatView({ bookId }: ChatViewProps) {
 
       {/* Input */}
       <div className="border-t p-4">
-        <form onSubmit={handleSubmit} className="flex gap-2">
+        <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2">
           <Textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder="Digite sua mensagem..."
-            className="resize-none"
+            className="resize-none w-full"
             rows={3}
             disabled={isStreaming}
             onKeyDown={(e) => {
@@ -243,14 +272,14 @@ export function ChatView({ bookId }: ChatViewProps) {
               }
             }}
           />
-          <div className="flex flex-col gap-2">
+          <div className="flex sm:flex-col gap-2">
             {isStreaming ? (
               <Button
                 type="button"
                 size="icon"
                 variant="destructive"
                 onClick={handleStopGeneration}
-                className="h-full"
+                className="h-full min-h-[44px] min-w-[44px]"
               >
                 <Square className="h-4 w-4" />
               </Button>
@@ -259,7 +288,7 @@ export function ChatView({ bookId }: ChatViewProps) {
                 type="submit"
                 size="icon"
                 disabled={!message.trim()}
-                className="h-full"
+                className="h-full min-h-[44px] min-w-[44px]"
               >
                 <Send className="h-4 w-4" />
               </Button>

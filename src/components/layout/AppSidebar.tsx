@@ -29,7 +29,11 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
-export function AppSidebar() {
+interface AppSidebarProps {
+  onBookSelect?: () => void;
+}
+
+export function AppSidebar({ onBookSelect }: AppSidebarProps = {}) {
   const { open } = useSidebar();
   const { user } = useAuthStore();
   const { selectedBookId, setSelectedBookId } = useBookStore();
@@ -172,7 +176,10 @@ export function AppSidebar() {
                 books.map((book) => (
                   <SidebarMenuItem key={book.id}>
                     <SidebarMenuButton
-                      onClick={() => setSelectedBookId(book.id)}
+                      onClick={() => {
+                        setSelectedBookId(book.id);
+                        onBookSelect?.();
+                      }}
                       className={cn(
                         'group',
                         selectedBookId === book.id && 'bg-accent text-accent-foreground'

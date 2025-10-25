@@ -4,7 +4,11 @@ import { BookOpen, MessageSquare, FileText } from 'lucide-react';
 import { ChatView } from '@/components/chat/ChatView';
 import { FichamentoView } from '@/components/fichamento/FichamentoView';
 
-export function MainContent() {
+interface MainContentProps {
+  activeTab?: 'chat' | 'fichamento';
+}
+
+export function MainContent({ activeTab }: MainContentProps = {}) {
   const { selectedBookId } = useBookStore();
 
   if (!selectedBookId) {
@@ -23,19 +27,22 @@ export function MainContent() {
 
   return (
     <main className="flex-1 overflow-hidden">
-      <Tabs defaultValue="chat" className="h-full flex flex-col">
-        <div className="border-b px-4">
-          <TabsList className="h-12">
-            <TabsTrigger value="chat" className="flex items-center gap-2">
-              <MessageSquare className="h-4 w-4" />
-              Chat
-            </TabsTrigger>
-            <TabsTrigger value="fichamento" className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Fichamento
-            </TabsTrigger>
-          </TabsList>
-        </div>
+      <Tabs value={activeTab || "chat"} className="h-full flex flex-col">
+        {/* Tabs list oculta em mobile quando há activeTab */}
+        {!activeTab && (
+          <div className="border-b px-4">
+            <TabsList className="h-12">
+              <TabsTrigger value="chat" className="flex items-center gap-2">
+                <MessageSquare className="h-4 w-4" />
+                <span className="hidden sm:inline">Chat</span>
+              </TabsTrigger>
+              <TabsTrigger value="fichamento" className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                <span className="hidden sm:inline">Fichamento</span>
+              </TabsTrigger>
+            </TabsList>
+          </div>
+        )}
         <div className="flex-1 overflow-hidden">
           <TabsContent value="chat" className="h-full m-0 p-0">
             <ChatView bookId={selectedBookId} />

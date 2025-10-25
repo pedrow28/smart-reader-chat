@@ -1,7 +1,8 @@
-import { BookOpen, LogOut } from 'lucide-react';
+import { BookOpen, LogOut, Menu } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { Button } from '@/components/ui/button';
 import { SidebarTrigger } from '@/components/ui/sidebar';
+import { useBreakpoint } from '@/hooks/useBreakpoint';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,8 +13,14 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
-export function AppHeader() {
+interface AppHeaderProps {
+  onMenuClick?: () => void;
+}
+
+export function AppHeader({ onMenuClick }: AppHeaderProps = {}) {
   const { user, signOut } = useAuthStore();
+  const breakpoint = useBreakpoint();
+  const isMobile = breakpoint === 'mobile';
 
   const userInitials = user?.email
     ?.split('@')[0]
@@ -23,7 +30,15 @@ export function AppHeader() {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex h-14 items-center px-4">
-        <SidebarTrigger className="mr-2" />
+        {/* Mobile: Menu button */}
+        {isMobile ? (
+          <Button variant="ghost" size="icon" className="mr-2" onClick={onMenuClick}>
+            <Menu className="h-5 w-5" />
+          </Button>
+        ) : (
+          <SidebarTrigger className="mr-2" />
+        )}
+        
         <div className="flex items-center gap-2 mr-auto">
           <BookOpen className="h-5 w-5 text-primary" />
           <h1 className="text-lg font-semibold">LumenRead</h1>
