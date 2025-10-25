@@ -206,6 +206,7 @@ Seja conversacional, empático e ajude o usuário a extrair insights valiosos do
                   // Stream content tokens
                   if (delta?.content) {
                     fullMessage += delta.content;
+                    console.log('Streaming content chunk:', delta.content);
                     controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
                       type: 'content',
                       content: delta.content 

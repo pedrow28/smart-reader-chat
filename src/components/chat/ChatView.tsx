@@ -123,6 +123,7 @@ export function ChatView({ bookId }: ChatViewProps) {
               const parsed = JSON.parse(data);
               
               if (parsed.type === 'content') {
+                console.log('Received streaming content:', parsed.content);
                 setStreamingContent(prev => prev + parsed.content);
               } else if (parsed.type === 'done') {
                 fichamentoUpdated = parsed.fichamentoUpdated;
