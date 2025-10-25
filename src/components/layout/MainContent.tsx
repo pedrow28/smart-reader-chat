@@ -5,7 +5,7 @@ import { ChatView } from '@/components/chat/ChatView';
 import { FichamentoView } from '@/components/fichamento/FichamentoView';
 
 interface MainContentProps {
-  activeTab?: 'chat' | 'fichamento';
+  activeTab?: 'books' | 'chat' | 'fichamento';
 }
 
 export function MainContent({ activeTab }: MainContentProps = {}) {
@@ -28,9 +28,9 @@ export function MainContent({ activeTab }: MainContentProps = {}) {
   return (
     <main className="flex-1 overflow-hidden">
       <Tabs value={activeTab || "chat"} className="h-full flex flex-col">
-        {/* Tabs list oculta em mobile quando há activeTab */}
+        {/* Tabs list - sempre visível e flutuante no scroll */}
         {!activeTab && (
-          <div className="border-b px-4">
+          <div className="sticky top-0 z-40 border-b px-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <TabsList className="h-12">
               <TabsTrigger value="chat" className="flex items-center gap-2">
                 <MessageSquare className="h-4 w-4" />
