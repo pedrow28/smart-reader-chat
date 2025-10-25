@@ -78,10 +78,7 @@ const AppPage = () => {
                 </div>
               )}
               {(mobileTab === 'chat' || mobileTab === 'fichamento') && (
-                <MainContent 
-                  activeTab={mobileTab} 
-                  onTabChange={(tab) => setMobileTab(tab)}
-                />
+                <MainContent activeTab={mobileTab} />
               )}
             </>
           )}

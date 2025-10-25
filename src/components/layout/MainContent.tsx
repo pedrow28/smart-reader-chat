@@ -5,15 +5,11 @@ import { ChatView } from '@/components/chat/ChatView';
 import { FichamentoView } from '@/components/fichamento/FichamentoView';
 
 interface MainContentProps {
-  activeTab?: 'books' | 'chat' | 'fichamento';
-  onTabChange?: (tab: 'chat' | 'fichamento') => void;
+  activeTab?: 'chat' | 'fichamento';
 }
 
-export function MainContent({ activeTab, onTabChange }: MainContentProps = {}) {
+export function MainContent({ activeTab }: MainContentProps = {}) {
   const { selectedBookId } = useBookStore();
-  
-  // Determina o tab atual, ignorando 'books'
-  const currentTab = activeTab === 'books' ? 'chat' : (activeTab || 'chat');
 
   if (!selectedBookId) {
     return (
@@ -31,13 +27,9 @@ export function MainContent({ activeTab, onTabChange }: MainContentProps = {}) {
 
   return (
     <main className="flex-1 overflow-hidden">
-      <Tabs 
-        value={currentTab} 
-        onValueChange={(value) => onTabChange?.(value as 'chat' | 'fichamento')}
-        className="h-full flex flex-col"
-      >
-        {/* Tabs list oculta em mobile quando há activeTab definido como 'books', 'chat' ou 'fichamento' */}
-        {activeTab !== 'chat' && activeTab !== 'fichamento' && (
+      <Tabs value={activeTab || "chat"} className="h-full flex flex-col">
+        {/* Tabs list oculta em mobile quando há activeTab */}
+        {!activeTab && (
           <div className="border-b px-4">
             <TabsList className="h-12">
               <TabsTrigger value="chat" className="flex items-center gap-2">
