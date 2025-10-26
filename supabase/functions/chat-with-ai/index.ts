@@ -195,21 +195,24 @@ Seja conversacional, empático e ajude o usuário a extrair insights valiosos do
             buffer = lines.pop() || '';
 
             for (const line of lines) {
+              if (!line.trim() || line.startsWith(':')) continue;
+              
               if (line.startsWith('data: ')) {
-                const data = line.slice(6);
+                const data = line.slice(6).trim();
                 if (data === '[DONE]') continue;
 
                 try {
                   const parsed = JSON.parse(data);
                   const delta = parsed.choices?.[0]?.delta;
 
-                  // Stream content tokens
+                  // Stream content tokens immediately
                   if (delta?.content) {
                     fullMessage += delta.content;
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+                    const chunk = encoder.encode(`data: ${JSON.stringify({ 
                       type: 'content',
                       content: delta.content 
-                    })}\n\n`));
+                    })}\n\n`);
+                    controller.enqueue(chunk);
                   }
 
                   // Collect tool calls
@@ -231,7 +234,7 @@ Seja conversacional, empático e ajude o usuário a extrair insights valiosos do
                     }
                   }
                 } catch (e) {
-                  console.error('Error parsing SSE data:', e);
+                  console.error('Error parsing SSE:', e, 'Line:', data);
                 }
               }
             }

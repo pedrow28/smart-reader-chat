@@ -196,68 +196,70 @@ export function FichamentoView({ bookId }: FichamentoViewProps) {
   };
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="max-w-4xl mx-auto p-6 space-y-6">
-        {/* Header with export button */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <div>
-                <CardTitle className="text-2xl">{book?.title}</CardTitle>
-                <CardDescription>{book?.author}</CardDescription>
-              </div>
-              
-              <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <Download className="h-4 w-4" />
-                    Exportar
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Exportar Fichamento</DialogTitle>
-                    <DialogDescription>
-                      Escolha o formato de exportação do seu fichamento
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="flex flex-col gap-3 mt-4">
-                    <Button onClick={exportAsPDF} className="gap-2">
-                      <FileText className="h-4 w-4" />
-                      Exportar como PDF
-                    </Button>
-                    <Button onClick={exportAsMarkdown} variant="outline" className="gap-2">
-                      <FileText className="h-4 w-4" />
-                      Exportar como Markdown
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
+    <div className="flex flex-col h-full bg-background">
+      {/* Header - Fixed */}
+      <div className="flex-shrink-0 border-b p-4 bg-background">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold">{book?.title || 'Carregando...'}</h2>
+              <p className="text-sm text-muted-foreground">{book?.author}</p>
             </div>
-          </CardHeader>
-        </Card>
+            <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Download className="h-4 w-4" />
+                  Exportar
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Exportar Fichamento</DialogTitle>
+                  <DialogDescription>
+                    Escolha o formato de exportação do seu fichamento
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="flex flex-col gap-3 mt-4">
+                  <Button onClick={exportAsPDF} className="gap-2">
+                    <FileText className="h-4 w-4" />
+                    Exportar como PDF
+                  </Button>
+                  <Button onClick={exportAsMarkdown} variant="outline" className="gap-2">
+                    <FileText className="h-4 w-4" />
+                    Exportar como Markdown
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
+      </div>
 
-        {sections.map((section, index) => (
-          <Card key={index}>
-            <CardHeader>
-              <CardTitle className="text-lg">{section.title}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {section.content ? (
-                <p className="text-sm text-foreground whitespace-pre-wrap">
-                  {section.content}
-                </p>
-              ) : (
-                <p className="text-sm text-muted-foreground italic">
-                  Nenhum conteúdo ainda
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+      {/* Content - Scrollable */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-4xl mx-auto p-6 space-y-6">
+          {sections.map((section, index) => (
+            <Card key={index}>
+              <CardHeader>
+                <CardTitle className="text-lg">{section.title}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {section.content ? (
+                  <p className="text-sm text-foreground whitespace-pre-wrap">
+                    {section.content}
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">
+                    Nenhum conteúdo ainda
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          ))}
 
-        <div className="text-xs text-muted-foreground text-right">
-          Última atualização: {new Date(summary.updated_at).toLocaleString('pt-BR')}
+          <div className="text-xs text-muted-foreground text-right pb-4">
+            Última atualização: {new Date(summary.updated_at).toLocaleString('pt-BR')}
+          </div>
         </div>
       </div>
     </div>

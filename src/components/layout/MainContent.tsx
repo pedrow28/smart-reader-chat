@@ -30,15 +30,15 @@ export function MainContent({ activeTab }: MainContentProps = {}) {
   }
 
   return (
-    <main className="flex-1 overflow-hidden">
+    <main className="flex-1 flex flex-col overflow-hidden">
       <Tabs 
         value={currentTab} 
         onValueChange={(value) => setInternalTab(value as 'chat' | 'fichamento')}
-        className="h-full flex flex-col"
+        className="flex-1 flex flex-col overflow-hidden"
       >
-        {/* Tabs list - sempre visível e flutuante no scroll */}
+        {/* Tabs list - sempre visível e flutuante */}
         {!activeTab && (
-          <div className="sticky top-0 z-40 border-b px-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="sticky top-0 z-40 border-b px-4 bg-background shadow-sm">
             <TabsList className="h-12">
               <TabsTrigger value="chat" className="flex items-center gap-2">
                 <MessageSquare className="h-4 w-4" />
@@ -52,10 +52,10 @@ export function MainContent({ activeTab }: MainContentProps = {}) {
           </div>
         )}
         <div className="flex-1 overflow-hidden">
-          <TabsContent value="chat" className="h-full m-0 p-0">
+          <TabsContent value="chat" className="h-full m-0 p-0 data-[state=active]:flex data-[state=active]:flex-col">
             <ChatView bookId={selectedBookId} />
           </TabsContent>
-          <TabsContent value="fichamento" className="h-full m-0 p-0">
+          <TabsContent value="fichamento" className="h-full m-0 p-0 data-[state=active]:flex data-[state=active]:flex-col">
             <FichamentoView bookId={selectedBookId} />
           </TabsContent>
         </div>

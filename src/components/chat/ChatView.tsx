@@ -172,9 +172,9 @@ export function ChatView({ bookId }: ChatViewProps) {
   };
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Memory Toggle */}
-      <div className="border-b p-3 bg-muted/30">
+    <div className="flex flex-col h-full bg-background">
+      {/* Memory Toggle - Fixed header */}
+      <div className="flex-shrink-0 border-b p-3 bg-muted/20">
         <div className="flex items-center justify-between max-w-4xl mx-auto">
           <div className="flex items-center gap-2">
             <Brain className="h-4 w-4 text-muted-foreground" />
@@ -195,106 +195,113 @@ export function ChatView({ bookId }: ChatViewProps) {
         )}
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      {/* Messages - Scrollable area */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-4xl mx-auto p-4 space-y-4">
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
-        ) : messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-center">
-            <div className="max-w-md">
-              <h3 className="text-lg font-semibold mb-2">Comece sua conversa</h3>
-              <p className="text-muted-foreground">
-                Compartilhe suas reflexões, citações e insights sobre este livro. A IA ajudará você a organizar e consolidar seus aprendizados.
-              </p>
+          ) : messages.length === 0 ? (
+            <div className="flex items-center justify-center min-h-[400px] text-center">
+              <div className="max-w-md">
+                <h3 className="text-lg font-semibold mb-2">Comece sua conversa</h3>
+                <p className="text-muted-foreground">
+                  Compartilhe suas reflexões, citações e insights sobre este livro. A IA ajudará você a organizar e consolidar seus aprendizados.
+                </p>
+              </div>
             </div>
-          </div>
-        ) : (
-          <>
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={cn(
-                  'flex',
-                  msg.role === 'user' ? 'justify-end' : 'justify-start'
-                )}
-              >
+          ) : (
+            <>
+              {messages.map((msg) => (
                 <div
+                  key={msg.id}
                   className={cn(
-                    'max-w-[80%] rounded-lg px-4 py-2',
-                    msg.role === 'user'
-                      ? 'bg-[hsl(var(--chat-user-bg))] text-foreground'
-                      : 'bg-[hsl(var(--chat-assistant-bg))] border'
+                    'flex w-full py-4',
+                    msg.role === 'user' ? 'justify-end' : 'justify-start'
                   )}
                 >
-                  <div className="prose prose-sm dark:prose-invert max-w-none">
-                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  <div
+                    className={cn(
+                      'max-w-[85%] rounded-2xl px-4 py-3',
+                      msg.role === 'user'
+                        ? 'bg-primary text-primary-foreground ml-auto'
+                        : 'bg-muted'
+                    )}
+                  >
+                    <div className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-            
-            {/* Streaming message */}
-            {isStreaming && streamingContent && (
-              <div className="flex justify-start">
-                <div className="max-w-[80%] rounded-lg px-4 py-2 bg-[hsl(var(--chat-assistant-bg))] border">
-                  <div className="prose prose-sm dark:prose-invert max-w-none">
-                    <ReactMarkdown>{streamingContent}</ReactMarkdown>
-                  </div>
-                  <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    <span>IA está respondendo…</span>
+              ))}
+              
+              {/* Streaming message - estilo ChatGPT */}
+              {isStreaming && (
+                <div className="flex w-full py-4 justify-start">
+                  <div className="max-w-[85%] rounded-2xl px-4 py-3 bg-muted">
+                    {streamingContent ? (
+                      <div className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                        <ReactMarkdown>{streamingContent}</ReactMarkdown>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span className="text-sm">Pensando...</span>
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
-            )}
-            
-            <div ref={messagesEndRef} />
-          </>
-        )}
+              )}
+              
+              <div ref={messagesEndRef} />
+            </>
+          )}
+        </div>
       </div>
 
-      {/* Input */}
-      <div className="border-t p-4">
-        <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2">
-          <Textarea
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder="Digite sua mensagem..."
-            className="resize-none w-full"
-            rows={3}
-            disabled={isStreaming}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSubmit(e);
-              }
-            }}
-          />
-          <div className="flex sm:flex-col gap-2">
+      {/* Input - Fixed footer */}
+      <div className="flex-shrink-0 border-t bg-background p-4">
+        <div className="max-w-4xl mx-auto w-full">
+          <form onSubmit={handleSubmit} className="flex gap-2 items-end">
+            <div className="flex-1 relative">
+              <Textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Envie uma mensagem..."
+                className="resize-none w-full pr-12 min-h-[52px] max-h-[200px] rounded-3xl"
+                rows={1}
+                disabled={isStreaming}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSubmit(e);
+                  }
+                }}
+              />
+            </div>
             {isStreaming ? (
               <Button
                 type="button"
                 size="icon"
-                variant="destructive"
+                variant="ghost"
                 onClick={handleStopGeneration}
-                className="h-full min-h-[44px] min-w-[44px]"
+                className="rounded-full h-10 w-10 flex-shrink-0"
               >
-                <Square className="h-4 w-4" />
+                <Square className="h-5 w-5 fill-current" />
               </Button>
             ) : (
               <Button
                 type="submit"
                 size="icon"
                 disabled={!message.trim()}
-                className="h-full min-h-[44px] min-w-[44px]"
+                className="rounded-full h-10 w-10 flex-shrink-0"
               >
-                <Send className="h-4 w-4" />
+                <Send className="h-5 w-5" />
               </Button>
             )}
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
     </div>
   );
