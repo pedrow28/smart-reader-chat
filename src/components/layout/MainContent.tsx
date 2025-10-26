@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useBookStore } from '@/store/bookStore';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BookOpen, MessageSquare, FileText } from 'lucide-react';
@@ -10,6 +11,9 @@ interface MainContentProps {
 
 export function MainContent({ activeTab }: MainContentProps = {}) {
   const { selectedBookId } = useBookStore();
+  const [internalTab, setInternalTab] = useState<'chat' | 'fichamento'>('chat');
+  
+  const currentTab = activeTab || internalTab;
 
   if (!selectedBookId) {
     return (
@@ -27,7 +31,11 @@ export function MainContent({ activeTab }: MainContentProps = {}) {
 
   return (
     <main className="flex-1 overflow-hidden">
-      <Tabs value={activeTab || "chat"} className="h-full flex flex-col">
+      <Tabs 
+        value={currentTab} 
+        onValueChange={(value) => setInternalTab(value as 'chat' | 'fichamento')}
+        className="h-full flex flex-col"
+      >
         {/* Tabs list - sempre visível e flutuante no scroll */}
         {!activeTab && (
           <div className="sticky top-0 z-40 border-b px-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
